@@ -15,8 +15,8 @@ app = FastAPI()
 # origins to reach the backend. Credentials are enabled so the session cookie can flow.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_origin_regex=r".*",
+    allow_origins=["http://localhost", "http://localhost:8000", "http://127.0.0.1:8000", "https://backend-j8gu.onrender.com"],
+    allow_origin_regex=r"chrome-extension://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
