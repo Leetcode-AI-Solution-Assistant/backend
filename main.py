@@ -5,9 +5,9 @@ from uuid import uuid4
 from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from .models import ChatIn, QuestionIn, SessionData
-from .session_setup import (SessionContext, backend, cookie, get_session_context,)
-from .chat_service import apply_user_message_and_get_reply
+from models import ChatIn, QuestionIn, SessionData
+from session_setup import (SessionContext, backend, cookie, get_session_context,)
+from chat_service import apply_user_message_and_get_reply
 
 app = FastAPI()
 
@@ -36,13 +36,15 @@ async def create_session(name: str, response: Response):
 async def get_questions(payload: QuestionIn | None = None, session: SessionContext = Depends(get_session_context)):
     # Accept either JSON body (preferred) or query param for backwards compatibility.
     question_number = payload.lc_question_number if payload else None
+    question_title = payload.lc_question_title.strip() if payload and payload.lc_question_title else None
     if question_number is None:
         return {"ok": False, "error": "Missing lc_question_number"}
 
+    title_fragment = f" titled '{question_title}'" if question_title else ""
     statement = (
-        f"LeetCode Question #{question_number}: get all the details about the question, "
-        "its test cases and keep it in your memory for future reference. "
-        "In your response just say 'Got it!' and nothing else."
+        f"LeetCode Question #{question_number}: {title_fragment}. "
+        f"Please identify and confirm the full title of this question, then gather and store all relevant details about it. "
+        f"In your acknowledgment, respond with: Title of the question and 'How may I assist you further?'"
     )
 
     # Add the question statement into the chat state so future replies stay contextual.

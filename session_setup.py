@@ -8,7 +8,7 @@ from fastapi_sessions.backends.implementations import InMemoryBackend
 from fastapi_sessions.frontends.implementations import SessionCookie, CookieParameters
 from fastapi_sessions.session_verifier import SessionVerifier
 
-from .models import SessionData
+from models import SessionData
 
 cookie_params = CookieParameters()
 

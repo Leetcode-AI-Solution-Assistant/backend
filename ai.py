@@ -7,9 +7,10 @@ from langchain_core.messages import SystemMessage, AIMessage
 from typing import Annotated, Literal
 from pydantic import BaseModel, Field, field_validator
 
-from .state import State
+from state import State
 
 load_dotenv()
+
 
 def build_graph(model: str = "claude-3-5-haiku-20241022", system_prompt: str | None = None,):
     llm = init_chat_model(model)
@@ -63,7 +64,7 @@ def build_graph(model: str = "claude-3-5-haiku-20241022", system_prompt: str | N
             Classify each message into one of the following categories. Read the detailed meaning of each category carefully before deciding.
 
             0. LeetCode Question
-            - Meaning: The user is providing a LeetCode question to be stored/acknowledged for later use (often asking for a simple “Got it!”).
+            - Meaning: The user is providing a LeetCode question to be stored/acknowledged for later use (often asking for a simple title of the Question).
             - Indicators: Mentions a LeetCode question number/title and asks to remember/store it; requests only an acknowledgment.
             - Focus: Acknowledge and remember the question context; no explanation or code yet.
 
@@ -73,9 +74,9 @@ def build_graph(model: str = "claude-3-5-haiku-20241022", system_prompt: str | N
             - Focus: Explain what the question is asking, not how to solve it.
 
             2. Solution Explanation
-            - Meaning: The user wants the AI to explain an Thought process of solving the problem and get to a solution.
+            - Meaning: The user wants the AI to explain the thought process of solving the problem — including BOTH a brute-force baseline and an optimized approach.
             - Indicators: "Can you explain the thought process of the solution?", "Break down the solution", "Can you walk me through how this solution works?"
-            - Focus: Clarify the logic, flow, or reasoning behind a provided solution (not rewriting or correcting it).
+            - Focus: Explain reasoning and strategy for BOTH brute-force and optimized approaches (conceptual only). Do NOT provide code unless the user explicitly asked for code.
 
             3. User Explanation Correction
             - Meaning: The user provides their own explanation of a question or solution and wants it corrected or validated.
@@ -101,13 +102,13 @@ def build_graph(model: str = "claude-3-5-haiku-20241022", system_prompt: str | N
             - Meaning: The user provides code with errors and wants it fixed so it runs correctly.
             - Indicators: "My code gives an error", "This doesn’t compile/run", "Fix my syntax or logic"
             - Focus: Identify and fix syntax, logic, or runtime errors in the provided code.
-            
+
             Summary Table:
             | Category | User Goal | Output |
             |-----------|------------|--------|
-            | LeetCode Question | Understand question details | Acknowledgment "Got it!" |
+            | LeetCode Question | Understand question details | Acknowledgment Title of the question |
             | Question explanation | Understand question meaning | Clarified question |
-            | Solution explanation | Understand existing solution | Conceptual explanation |
+            | Solution explanation | Understand solution strategy | Conceptual brute-force + optimized explanation |
             | User explanation correction | Validate/fix user explanation | Corrected explanation |
             | User solution correction | Validate user’s code/logic | Feedback on correctness |
             | Code the solution as per user req/code correction | Get working or modified code | New/fixed code |
@@ -120,7 +121,7 @@ def build_graph(model: str = "claude-3-5-haiku-20241022", system_prompt: str | N
         }])
 
         return {"message_type": result.message_type}
-    
+
     def router_node(state: State) -> dict:
         message_type = state["message_type"]
         if message_type == "LeetCode Question":
@@ -143,11 +144,11 @@ def build_graph(model: str = "claude-3-5-haiku-20241022", system_prompt: str | N
             return {"next": "End Task"}
         # Fallback keeps execution safe if an unexpected type slips through.
         return {"next": "assistant"}
-    
+
     def leetcode_question_node(state: State) -> dict:
         # Implement the logic for handling LeetCode question here.
         last_message = state["messages"][-1]
-        print( "Last message in LeetCode question node:", last_message.content)
+        print("Last message in LeetCode question node:", last_message.content)
 
         messages = [
             SystemMessage(content="""
@@ -156,7 +157,7 @@ def build_graph(model: str = "claude-3-5-haiku-20241022", system_prompt: str | N
                 Your task is to:
                 1. Extract all relevant details about the LeetCode question mentioned by the user.
                 2. Store these details in your memory for future reference.
-                3. In your response, simply acknowledge that you have received and stored the information by saying 'Got it!' and nothing else.
+                3. In your response, simply acknowledge that you have received and stored the information by saying The title of the Question and nothing else.
 
                 Guidelines:
                 - Do NOT provide any explanations, solutions, or code related to the question at this stage.
@@ -164,7 +165,7 @@ def build_graph(model: str = "claude-3-5-haiku-20241022", system_prompt: str | N
             """)
         ] + state["messages"]
         reply = llm.invoke(messages)
-        
+
         return {"messages": [AIMessage(content=reply.content)]}
 
     def solution_explanation_node(state: State) -> dict:
@@ -173,27 +174,32 @@ def build_graph(model: str = "claude-3-5-haiku-20241022", system_prompt: str | N
 
         messages = [
             SystemMessage(content="""
-                You are an expert problem solver and algorithmic reasoning coach. 
+                You are an expert problem solver and algorithmic reasoning coach.
                 Your task is to **explain the thought process** behind solving the given LeetCode problem — NOT the code implementation.
 
-                Explain step-by-step **how to think** when encountering such a problem in the future. 
+                Explain step-by-step **how to think** when encountering such a problem in the future.
                 Focus on developing the *problem-solving mindset* rather than syntax or language-specific details.
 
                 Structure your explanation as follows:
-                1. **Problem Restatement:** Rephrase the problem in simple words to ensure understanding.  
-                2. **Observation and Pattern Recognition:** What clues or properties stand out? What category of problem is it (e.g., DP, graph, greedy, two pointers)?  
-                3. **Reasoning Path:** How would an experienced coder start thinking? Which smaller subproblems, constraints, or edge cases should be considered first?  
-                4. **Approach Evolution:** Describe the progression from a brute-force or naive idea to an optimized approach — what realizations lead to this improvement?  
-                5. **Generalization:** Explain what *mental pattern* or *intuition* this problem builds — how can similar future problems be recognized and tackled using this mindset?  
+                1. **Problem Restatement:** Rephrase the problem in simple words to ensure understanding.
+                2. **Observation and Pattern Recognition:** What clues or properties stand out? What category of problem is it (e.g., DP, graph, greedy, two pointers)?
+                3. **Reasoning Path:** How would an experienced coder start thinking? Which smaller subproblems, constraints, or edge cases should be considered first?
+                4. **Approach Evolution:** Describe the progression from a brute-force or naive idea to an optimized approach — what realizations lead to this improvement?
+                5. **Generalization:** Explain what *mental pattern* or *intuition* this problem builds — how can similar future problems be recognized and tackled using this mindset?
                 6. **Common Pitfalls:** List mistakes or misleading ideas a beginner might fall for and how to avoid them.
+                7. **Key Insight Summary:** The Solution should explain both the brute force approach and optimized approach.
+                8. Provide two labeled mini-sections: **Brute-Force Approach** (core idea + time/space) and **Optimized Approach** (core idea + time/space + why it improves on brute force).
 
                 End with a short summary of the **key insight** or **trigger thought** that unlocks the solution.
-                Avoid giving or explaining code — focus only on logical reasoning and strategic thinking.
+                
+                STRICT GUIDELINES:
+                - Do NOT provide any code or pseudocode.
+                - Keep explanations clear, concise, and beginner-friendly.
             """)
         ] + state["messages"]
         reply = llm.invoke(messages)
         return {"messages": [AIMessage(content=reply.content)]}
-    
+
     def user_explanation_correction_node(state: State) -> dict:
         last_message = state["messages"][-1]
 
@@ -239,11 +245,14 @@ def build_graph(model: str = "claude-3-5-haiku-20241022", system_prompt: str | N
                 - Prefer short, concrete sentences.
                 - Ask at most ONE clarifying question only if the user's message lacks the actual problem statement
                 (or mixes multiple problems). Otherwise, do not ask questions.
-                        """)] + state["messages"]
+                - Do NOT provide any code or pseudocode.
+                - Keep explanations clear, concise, and beginner-friendly.
+            """)
+        ] + state["messages"]
 
         reply = llm.invoke(messages)
         return {"messages": [AIMessage(content=reply.content)]}
-    
+
     def question_explanation_node(state: State) -> dict:
         # Implement the logic for question explanation here.
         last_message = state["messages"][-1]
@@ -264,12 +273,16 @@ def build_graph(model: str = "claude-3-5-haiku-20241022", system_prompt: str | N
                 3. **Goal Summary:** End with a one-line summary like “In short, the problem is asking us to ____.”
 
                 Keep it friendly, clear, and easy to understand — like you’re explaining it to a classmate new to coding.
+                
+                STRICT GUIDELINES:
+                - Do NOT provide any code or pseudocode.
+                - Keep explanations clear, concise, and beginner-friendly.
             """)
         ] + state["messages"]
         reply = llm.invoke(messages)
 
         return {"messages": [AIMessage(content=reply.content)]}
-    
+
     def code_solution_node(state: State) -> dict:
         # Implement the logic for coding the solution here.
         last_message = state["messages"][-1]
@@ -277,34 +290,56 @@ def build_graph(model: str = "claude-3-5-haiku-20241022", system_prompt: str | N
         messages = [
             SystemMessage(content="""You are an expert LeetCode problem solver and programming tutor.
 
-                Your task is to:
-                1. Write clean, efficient, and correct code to solve the given LeetCode problem.
-                2. Explain the code step-by-step in a clear and simple way so that even a beginner can understand it.
+                    Your goal is to fully solve the given LeetCode question by writing both brute-force and optimized solutions, and explaining them clearly.
 
-                Follow this structure:
+                    Follow this strict structure in your response:
 
-                A. 🧩 Problem Understanding (1–2 lines)
-                - Briefly restate what the problem is asking for (no deep reasoning needed).
+                    ---
 
-                B. 💻 Code Implementation
-                - Provide the full, working solution in the language specified by the user.
-                - Use best practices: clean variable names, proper indentation, and brief inline comments if helpful.
+                    A. 🧩 Problem Understanding
+                    - Restate the problem in 1–2 simple sentences (no extra reasoning).
+                    - Clearly mention what is being asked for (output) and what is given (input).
 
-                C. 🧠 Code Explanation
-                - Explain how the code works line by line or block by block.
-                - Clarify key algorithmic steps, loops, conditions, and data structures used.
-                - Mention the **time and space complexity** at the end.
+                    ---
 
-                Rules:
-                - Focus on accuracy and readability.
-                - Do not skip steps or assume prior knowledge.
-                - If the user specifies a programming language, use it. Otherwise, default to Python.
+                    B. 💻 Code Implementation
+                    You must include **two separate and labeled solutions**:
+                    1. **Brute Force Approach (Baseline)**
+                    - Write simple, direct, and readable code that solves the problem correctly but inefficiently.
+                    - Use small inline comments to explain logic flow.
+
+                    2. **Optimized Approach (Efficient)**
+                    - Rewrite the solution using an improved algorithm or data structure.
+                    - Follow clean coding conventions and ensure correctness.
+                    - Include helpful inline comments for each major step.
+
+                    If no programming language is specified, **default to Python**.
+
+                    ---
+
+                    C. 🧠 Step-by-Step Code Explanation
+                    For both versions:
+                    - Explain the logic in plain language, line by line or block by block.
+                    - Emphasize how the optimized version improves upon the brute-force one (algorithmic idea, data structure, etc.).
+                    - Include a clear comparison of **Time Complexity** and **Space Complexity** for both.
+
+                    ---
+
+                    D. 📈 Summary
+                    - End with a short summary table comparing brute-force vs optimized versions.
+
+                    ---
+
+                    Rules:
+                    - Always provide **both code versions** — never skip one.
+                    - Explanations should be **educational and beginner-friendly**.
+                    - Maintain clarity, accuracy, and completeness.
             """)
         ] + state["messages"]
         reply = llm.invoke(messages)
 
         return {"messages": [AIMessage(content=reply.content)]}
-    
+
     def asking_language_node(state: State) -> dict:
         # Implement the logic for asking user for programming language here.
         last_message = state["messages"][-1]
@@ -323,9 +358,12 @@ def build_graph(model: str = "claude-3-5-haiku-20241022", system_prompt: str | N
                 2. Do NOT generate any code or explanation until the user confirms their preferred language.
 
                 3. Once the language is confirmed:
-                - Write the full, clean, and efficient code solution in that language.
-                - Then explain the code step by step in simple terms.
-                - End with the time and space complexity.
+                - Write TWO complete solutions in that language:
+                  (a) Brute Force Approach (Baseline)
+                  (b) Optimized Approach (Efficient)
+                - Clearly label both code blocks.
+                - Then explain both solutions step by step in simple terms.
+                - End with a comparison of time and space complexity for both.
 
                 Guidelines:
                 - Always confirm the language first — even if the user doesn’t mention it.
@@ -336,7 +374,7 @@ def build_graph(model: str = "claude-3-5-haiku-20241022", system_prompt: str | N
         reply = llm.invoke(messages)
 
         return {"messages": [AIMessage(content=reply.content)]}
-    
+
     def user_solution_correction_node(state: State) -> dict:
         # Implement the logic for user solution correction here.
         last_message = state["messages"][-1]
@@ -383,10 +421,11 @@ def build_graph(model: str = "claude-3-5-haiku-20241022", system_prompt: str | N
                 - No pseudocode (no “loop”, “dp[i]”, “two pointers”, code-like steps).
                 - Don’t restate the entire problem unless it’s necessary to correct the user’s misunderstanding.
                 - Don’t add extra topics beyond correcting the user’s logic.
-                        """)] + state["messages"]
+            """)
+        ] + state["messages"]
         reply = llm.invoke(messages)
         return {"messages": [AIMessage(content=reply.content)]}
-    
+
     def user_code_correction_node(state: State) -> dict:
         # Implement the logic for user solution correction here.
         last_message = state["messages"][-1]
@@ -431,7 +470,7 @@ def build_graph(model: str = "claude-3-5-haiku-20241022", system_prompt: str | N
         reply = llm.invoke(messages)
 
         return {"messages": [AIMessage(content=reply.content)]}
-    
+
     builder = StateGraph(State)
 
     # --- Add your custom nodes/edges here ---

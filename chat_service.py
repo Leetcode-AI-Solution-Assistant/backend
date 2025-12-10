@@ -4,10 +4,10 @@ from uuid import UUID
 
 from langchain_core.messages import HumanMessage
 
-from .ai import graph
-from .models import SessionData
-from .state_adapter import session_to_state, state_to_session
-from .state import State
+from ai import graph
+from models import SessionData
+from state_adapter import session_to_state, state_to_session
+from state import State
 
 async def run_graph(state: State) -> State:
     """Run the compiled LangGraph and return the new conversation state."""

@@ -54,7 +54,7 @@ API quick reference
 -------------------
 - `POST /create_session/{name}` – Creates a session, sets a cookie, and returns `session_id`.
 - `GET /whoami` – Returns stored session data for the current session.
-- `POST /questions` – Body: `{"lc_question_number": <int>}`. Sends a “store this LeetCode question” message to the graph; reply should be “Got it!”.
+- `POST /questions` – Body: `{"lc_question_number": <int>, "lc_question_title": "<str | optional>"}`. Sends a “store this LeetCode question” message (including the title when provided); reply should be “Got it!”.
 - `POST /chat` – Body: `{"text": "<user message>"}`. Runs the message through the classifier + node graph and returns the assistant reply and message type.
 - `POST /delete_session` – Deletes the current session and clears the cookie.
 

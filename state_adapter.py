@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, BaseMessage
 
-from .models import SessionData, StoredMessage
-from .state import State
+from models import SessionData, StoredMessage
+from state import State
 
 def stored_to_lc(msg: StoredMessage) -> BaseMessage:
     if msg.role == "user":

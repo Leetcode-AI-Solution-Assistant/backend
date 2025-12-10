@@ -21,6 +21,7 @@ class SessionData(BaseModel):
 
 class QuestionIn(BaseModel):
     lc_question_number: int
+    lc_question_title: str | None = None
 
 class ChatIn(BaseModel):
     text: str
