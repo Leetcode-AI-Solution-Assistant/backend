@@ -25,12 +25,18 @@ app.add_middleware(
 @app.post("/create_session/{name}")
 async def create_session(name: str, response: Response):
     session_id = uuid4()
-    data = SessionData(username=name)
+    auth_token = uuid4().hex
+    data = SessionData(username=name, auth_token=auth_token)
 
     await backend.create(session_id, data)
     cookie.attach_to_response(response, session_id)
 
-    return {"ok": True, "session_id": str(session_id), "username": name}
+    return {
+        "ok": True,
+        "session_id": str(session_id),
+        "username": name,
+        "auth_token": auth_token,
+    }
 
 @app.post("/questions")
 async def get_questions(payload: QuestionIn | None = None, session: SessionContext = Depends(get_session_context)):

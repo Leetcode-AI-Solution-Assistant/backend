@@ -102,8 +102,20 @@ class SessionContext:
     data: SessionData
 
 
-async def get_session_context(session_id: UUID = Depends(resolve_session_id)) -> SessionContext:
+async def get_session_context(
+    request: Request,
+    session_id: UUID = Depends(resolve_session_id),
+    session_auth: str | None = Header(default=None, alias="X-Session-Auth"),
+) -> SessionContext:
+    """Load the session and require an auth token to guard against spoofed IDs."""
     session = await backend.read(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found or expired")
+
+    expected = session.auth_token
+    # Cookie-only flows still need to present the token to prevent hijack by guessing the ID.
+    provided = session_auth or request.cookies.get("session_auth")
+    if not provided or provided != expected:
+        raise HTTPException(status_code=403, detail="Invalid session auth token")
+
     return SessionContext(id=session_id, data=session)

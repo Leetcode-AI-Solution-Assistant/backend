@@ -18,6 +18,7 @@ class SessionData(BaseModel):
     username: str
     messages: list[StoredMessage] = Field(default_factory=list)
     message_type: str | None = None
+    auth_token: str
 
 class QuestionIn(BaseModel):
     lc_question_number: int
